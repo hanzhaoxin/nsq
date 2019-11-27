@@ -16,30 +16,30 @@ import (
 
 type Topic struct {
 	// 64bit atomic vars need to be first for proper alignment on 32bit platforms
-	messageCount uint64
-	messageBytes uint64
+	messageCount uint64	//消息数量
+	messageBytes uint64	//消息字节长度
 
 	sync.RWMutex
 
-	name              string
-	channelMap        map[string]*Channel
-	backend           BackendQueue
-	memoryMsgChan     chan *Message
-	startChan         chan int
-	exitChan          chan int
-	channelUpdateChan chan int
-	waitGroup         util.WaitGroupWrapper
-	exitFlag          int32
-	idFactory         *guidFactory
+	name              string	//topic名称
+	channelMap        map[string]*Channel	//topic关联的channel
+	backend           BackendQueue	//backend队列：用于接收消息，消息存放到磁盘
+	memoryMsgChan     chan *Message	//内存消息队列：用于接收消息，消息存放到内存
+	startChan         chan int	//开始信号通道
+	exitChan          chan int	//退出信号通道
+	channelUpdateChan chan int	//channel变更的消息通道
+	waitGroup         util.WaitGroupWrapper	// 工具类，可类比java CountDownLatch
+	exitFlag          int32	//退出标识
+	idFactory         *guidFactory	//Guid工厂
 
-	ephemeral      bool
-	deleteCallback func(*Topic)
-	deleter        sync.Once
+	ephemeral      bool	//是否是临时的topic
+	deleteCallback func(*Topic)	//删除topic的方法，通过该模式，从上层对象中移除自己
+	deleter        sync.Once	//只执行一次
 
-	paused    int32
-	pauseChan chan int
+	paused    int32	//是否暂停  1 暂停，0不暂停
+	pauseChan chan int	//暂停或取消暂停信息的通道
 
-	ctx *context
+	ctx *context	//上下文，存储有nsqd的指针
 }
 
 // Topic constructor
@@ -70,20 +70,20 @@ func NewTopic(topicName string, ctx *context, deleteCallback func(*Topic)) *Topi
 			lg.Logf(opts.Logger, opts.LogLevel, lg.LogLevel(level), f, args...)
 		}
 		t.backend = diskqueue.New(
-			topicName,
-			ctx.nsqd.getOpts().DataPath,
-			ctx.nsqd.getOpts().MaxBytesPerFile,
-			int32(minValidMsgLength),
-			int32(ctx.nsqd.getOpts().MaxMsgSize)+minValidMsgLength,
-			ctx.nsqd.getOpts().SyncEvery,
-			ctx.nsqd.getOpts().SyncTimeout,
+			topicName,	//topic名称
+			ctx.nsqd.getOpts().DataPath,	//数据路径
+			ctx.nsqd.getOpts().MaxBytesPerFile,	//每个文件的最大字节数
+			int32(minValidMsgLength), //每条消息的最小长度
+			int32(ctx.nsqd.getOpts().MaxMsgSize)+minValidMsgLength, //每条消息的最大长度
+			ctx.nsqd.getOpts().SyncEvery, //缓存消息有多少条后进行写入
+			ctx.nsqd.getOpts().SyncTimeout, //自动写入消息文件的时间间隔
 			dqLogf,
 		)
 	}
 
-	t.waitGroup.Wrap(t.messagePump)
+	t.waitGroup.Wrap(t.messagePump) //消息轮询，从topic搬移到channel
 
-	t.ctx.nsqd.Notify(t)
+	t.ctx.nsqd.Notify(t) //通知nsqd新建了Topic
 
 	return t
 }
@@ -250,6 +250,7 @@ func (t *Topic) messagePump() {
 	var backendChan chan []byte
 
 	// do not pass messages before Start(), but avoid blocking Pause() or GetChannel()
+	//不在Start()函数调用之前接收消息
 	for {
 		select {
 		case <-t.channelUpdateChan:
@@ -264,25 +265,25 @@ func (t *Topic) messagePump() {
 	}
 	t.RLock()
 	for _, c := range t.channelMap {
-		chans = append(chans, c)
+		chans = append(chans, c) //获取所有该topic对应的Channel
 	}
 	t.RUnlock()
-	if len(chans) > 0 && !t.IsPaused() {
-		memoryMsgChan = t.memoryMsgChan
-		backendChan = t.backend.ReadChan()
+	if len(chans) > 0 && !t.IsPaused() {	//如果Channel的长度大于0，并且topic不是暂停状态
+		memoryMsgChan = t.memoryMsgChan		//获取内存队列
+		backendChan = t.backend.ReadChan()	//获取backend队列
 	}
 
 	// main message loop
 	for {
 		select {
-		case msg = <-memoryMsgChan:
-		case buf = <-backendChan:
+		case msg = <-memoryMsgChan:	//从内存中获取消息
+		case buf = <-backendChan:	//从磁盘中获取消息
 			msg, err = decodeMessage(buf)
 			if err != nil {
 				t.ctx.nsqd.logf(LOG_ERROR, "failed to decode message - %s", err)
 				continue
 			}
-		case <-t.channelUpdateChan:
+		case <-t.channelUpdateChan:	//channel变更信号
 			chans = chans[:0]
 			t.RLock()
 			for _, c := range t.channelMap {
@@ -297,7 +298,7 @@ func (t *Topic) messagePump() {
 				backendChan = t.backend.ReadChan()
 			}
 			continue
-		case <-t.pauseChan:
+		case <-t.pauseChan:	//暂停、取消暂停信号
 			if len(chans) == 0 || t.IsPaused() {
 				memoryMsgChan = nil
 				backendChan = nil
@@ -306,10 +307,11 @@ func (t *Topic) messagePump() {
 				backendChan = t.backend.ReadChan()
 			}
 			continue
-		case <-t.exitChan:
+		case <-t.exitChan:	//退出信号
 			goto exit
 		}
 
+		// 只有获取了msg才会走到这，其他分支都continue了。
 		for i, channel := range chans {
 			chanMsg := msg
 			// copy the message because each channel
@@ -317,14 +319,17 @@ func (t *Topic) messagePump() {
 			// fastpath to avoid copy if its the first channel
 			// (the topic already created the first copy)
 			if i > 0 {
+				// 复制消息
 				chanMsg = NewMessage(msg.ID, msg.Body)
 				chanMsg.Timestamp = msg.Timestamp
 				chanMsg.deferred = msg.deferred
 			}
 			if chanMsg.deferred != 0 {
+				// 发送延时消息
 				channel.PutMessageDeferred(chanMsg, chanMsg.deferred)
 				continue
 			}
+			// 发送及时消息
 			err := channel.PutMessage(chanMsg)
 			if err != nil {
 				t.ctx.nsqd.logf(LOG_ERROR,

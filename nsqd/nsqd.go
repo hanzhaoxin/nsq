@@ -497,14 +497,18 @@ func (n *NSQD) GetTopic(topicName string) *Topic {
 	// topic is created but messagePump not yet started
 
 	// if loading metadata at startup, no lookupd connections yet, topic started after load
+	//如果启动时正在加载元数据，没有连接nsqlookupd，topic在加载完元数据后启动
 	if atomic.LoadInt32(&n.isLoading) == 1 {
 		return t
 	}
 
 	// if using lookupd, make a blocking call to get the topics, and immediately create them.
 	// this makes sure that any message received is buffered to the right channels
+	//获取nsqd所配置的lookupd的http地址
 	lookupdHTTPAddrs := n.lookupdHTTPAddrs()
 	if len(lookupdHTTPAddrs) > 0 {
+		//根据topic名称，从nsqlookupd获取所有关联的channel名称
+		//(消费者消费消息时会指定topic及对应的channel，所以nsqlookupd中维护者topic和channel的对应关系(一对多))
 		channelNames, err := n.ci.GetLookupdTopicChannels(t.name, lookupdHTTPAddrs)
 		if err != nil {
 			n.logf(LOG_WARN, "failed to query nsqlookupd for channels to pre-create for topic %s - %s", t.name, err)
