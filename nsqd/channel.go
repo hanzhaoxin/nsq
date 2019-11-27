@@ -45,14 +45,14 @@ type Channel struct {
 	name      string
 	ctx       *context
 
-	backend BackendQueue
+	backend BackendQueue // 磁盘存储的消息文件
 
-	memoryMsgChan chan *Message
+	memoryMsgChan chan *Message // 内存消息队列
 	exitFlag      int32
 	exitMutex     sync.RWMutex
 
 	// state tracking
-	clients        map[int64]Consumer
+	clients        map[int64]Consumer // 消费者客户端
 	paused         int32
 	ephemeral      bool
 	deleteCallback func(*Channel)
@@ -62,11 +62,11 @@ type Channel struct {
 	e2eProcessingLatencyStream *quantile.Quantile
 
 	// TODO: these can be DRYd up
-	deferredMessages map[MessageID]*pqueue.Item
-	deferredPQ       pqueue.PriorityQueue
+	deferredMessages map[MessageID]*pqueue.Item // 延时消息和投递失败等待指定时间后重新投递的消息
+	deferredPQ       pqueue.PriorityQueue // 存放延时消息和投递失败等待指定时间后重新投递的消息
 	deferredMutex    sync.Mutex
-	inFlightMessages map[MessageID]*Message
-	inFlightPQ       inFlightPqueue
+	inFlightMessages map[MessageID]*Message // 存储MessageID和Message的对应关系
+	inFlightPQ       inFlightPqueue // 正在投递但还没确认投递成功的消息
 	inFlightMutex    sync.Mutex
 }
 
@@ -117,7 +117,7 @@ func NewChannel(topicName string, channelName string, ctx *context,
 		)
 	}
 
-	c.ctx.nsqd.Notify(c)
+	c.ctx.nsqd.Notify(c) // 通知nsqd创建了Channel
 
 	return c
 }
@@ -289,6 +289,7 @@ func (c *Channel) IsPaused() bool {
 }
 
 // PutMessage writes a Message to the queue
+// 添加即时消息
 func (c *Channel) PutMessage(m *Message) error {
 	c.RLock()
 	defer c.RUnlock()
@@ -303,6 +304,7 @@ func (c *Channel) PutMessage(m *Message) error {
 	return nil
 }
 
+// 如果没有消费者读取消息，消息首先会在内存中排队，当量太大时就会被保存到磁盘中。
 func (c *Channel) put(m *Message) error {
 	select {
 	case c.memoryMsgChan <- m:
@@ -320,6 +322,7 @@ func (c *Channel) put(m *Message) error {
 	return nil
 }
 
+// 添加延时消息
 func (c *Channel) PutMessageDeferred(msg *Message, timeout time.Duration) {
 	atomic.AddUint64(&c.messageCount, 1)
 	c.StartDeferredTimeout(msg, timeout)

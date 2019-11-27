@@ -32,6 +32,7 @@ func (p *tcpServer) Handle(clientConn net.Conn) {
 		clientConn.RemoteAddr(), protocolMagic)
 
 	var prot protocol.Protocol
+	// 当有新的客户端连接后，检测协议版本号
 	switch protocolMagic {
 	case "  V2":
 		prot = &protocolV2{ctx: p.ctx}
@@ -44,7 +45,7 @@ func (p *tcpServer) Handle(clientConn net.Conn) {
 	}
 
 	p.conns.Store(clientConn.RemoteAddr(), clientConn)
-
+	// 调用protocol_v2的IOLoop(conn net.Conn)进行客户端读写操作
 	err = prot.IOLoop(clientConn)
 	if err != nil {
 		p.ctx.nsqd.logf(LOG_ERROR, "client(%s) - %s", clientConn.RemoteAddr(), err)

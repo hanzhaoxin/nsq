@@ -39,6 +39,7 @@ func (p *program) Init(env svc.Environment) error {
 }
 
 func (p *program) Start() error {
+	// 加载参数及参数的默认值
 	opts := nsqd.NewOptions()
 
 	flagSet := nsqdFlagSet(opts)
@@ -61,23 +62,28 @@ func (p *program) Start() error {
 	}
 	cfg.Validate()
 
+	// 将用户配置的参数值设置到对应的参数
 	options.Resolve(opts, flagSet, cfg)
+	// 初始化NSQD结构体，并检验Options配置信息是否有误
 	nsqd, err := nsqd.New(opts)
 	if err != nil {
 		logFatal("failed to instantiate nsqd - %s", err)
 	}
 	p.nsqd = nsqd
 
+	// 加载元数据信息（根据元数据创建topic和channel对象）
 	err = p.nsqd.LoadMetadata()
 	if err != nil {
 		logFatal("failed to load metadata - %s", err)
 	}
+	// 将元数据持久化到文件中
 	err = p.nsqd.PersistMetadata()
 	if err != nil {
 		logFatal("failed to persist metadata - %s", err)
 	}
 
 	go func() {
+		// 启动nsqd服务
 		err := p.nsqd.Main()
 		if err != nil {
 			p.Stop()

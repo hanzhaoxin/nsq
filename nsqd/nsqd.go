@@ -257,11 +257,13 @@ func (n *NSQD) Main() error {
 		})
 	}
 
+	// 开启一个tcp服务，用于监听tcp连接
 	n.tcpServer.ctx = ctx
 	n.waitGroup.Wrap(func() {
 		exitFunc(protocol.TCPServer(n.tcpListener, n.tcpServer, n.logf))
 	})
 
+	// 开启一个http的Serve，用于监听http请求
 	httpServer := newHTTPServer(ctx, false, n.getOpts().TLSRequired == TLSRequired)
 	n.waitGroup.Wrap(func() {
 		exitFunc(http_api.Serve(n.httpListener, httpServer, "HTTP", n.logf))
@@ -274,7 +276,9 @@ func (n *NSQD) Main() error {
 		})
 	}
 
+	// 调用queueScanLoop()方法
 	n.waitGroup.Wrap(n.queueScanLoop)
+	// 调用lookupLoop()方法
 	n.waitGroup.Wrap(n.lookupLoop)
 	if n.getOpts().StatsdAddress != "" {
 		n.waitGroup.Wrap(n.statsdLoop)
@@ -329,6 +333,7 @@ func (n *NSQD) LoadMetadata() error {
 
 	fn := newMetadataFile(n.getOpts())
 
+	// 读取元数据
 	data, err := readOrEmpty(fn)
 	if err != nil {
 		return err
@@ -337,6 +342,7 @@ func (n *NSQD) LoadMetadata() error {
 		return nil // fresh start
 	}
 
+	// 用Json解析
 	var m meta
 	err = json.Unmarshal(data, &m)
 	if err != nil {
@@ -348,6 +354,7 @@ func (n *NSQD) LoadMetadata() error {
 			n.logf(LOG_WARN, "skipping creation of invalid topic %s", t.Name)
 			continue
 		}
+		// 获取Topic对象
 		topic := n.GetTopic(t.Name)
 		if t.Paused {
 			topic.Pause()
@@ -357,6 +364,7 @@ func (n *NSQD) LoadMetadata() error {
 				n.logf(LOG_WARN, "skipping creation of invalid channel %s", c.Name)
 				continue
 			}
+			// 获取Channel对象
 			channel := topic.GetChannel(c.Name)
 			if c.Paused {
 				channel.Pause()
@@ -440,6 +448,7 @@ func (n *NSQD) Exit() {
 	}
 
 	n.Lock()
+	// 将元数据持久化到文件中
 	err := n.PersistMetadata()
 	if err != nil {
 		n.logf(LOG_ERROR, "failed to persist metadata - %s", err)
@@ -478,6 +487,7 @@ func (n *NSQD) GetTopic(topicName string) *Topic {
 	deleteCallback := func(t *Topic) {
 		n.DeleteExistingTopic(t.name)
 	}
+	// 如果不存在，创建一个。
 	t = NewTopic(topicName, &context{n}, deleteCallback)
 	n.topicMap[topicName] = t
 
@@ -662,6 +672,7 @@ func (n *NSQD) queueScanLoop() {
 	channels := n.channels()
 	n.resizePool(len(channels), workCh, responseCh, closeCh)
 
+	// 定期   执行根据channel的数量控制worker Pool中worker的数量
 	for {
 		select {
 		case <-workTicker.C:

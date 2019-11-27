@@ -83,6 +83,7 @@ type Options struct {
 	SnappyEnabled   bool `flag:"snappy"`
 }
 
+// 加载参数及参数的默认值
 func NewOptions() *Options {
 	hostname, err := os.Hostname()
 	if err != nil {
