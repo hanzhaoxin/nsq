@@ -94,7 +94,7 @@ type clientV2 struct {
 	SampleRate int32
 
 	IdentifyEventChan chan identifyEvent
-	SubEventChan      chan *Channel
+	SubEventChan      chan *Channel	//该客户端，订阅的Channel链。
 
 	TLS     int32
 	Snappy  int32
@@ -118,10 +118,10 @@ func newClientV2(id int64, conn net.Conn, ctx *context) *clientV2 {
 		ID:  id,
 		ctx: ctx,
 
-		Conn: conn,
+		Conn: conn,	//对应的tcp链接
 
-		Reader: bufio.NewReaderSize(conn, defaultBufferSize),
-		Writer: bufio.NewWriterSize(conn, defaultBufferSize),
+		Reader: bufio.NewReaderSize(conn, defaultBufferSize),	//对tcp链接读缓冲 16k
+		Writer: bufio.NewWriterSize(conn, defaultBufferSize),	//对tcp链接写缓冲 16k
 
 		OutputBufferSize:    defaultBufferSize,
 		OutputBufferTimeout: ctx.nsqd.getOpts().OutputBufferTimeout,
@@ -135,10 +135,10 @@ func newClientV2(id int64, conn net.Conn, ctx *context) *clientV2 {
 		ConnectTime:    time.Now(),
 		State:          stateInit,
 
-		ClientID: identifier,
+		ClientID: identifier,	//客户端唯一标识
 		Hostname: identifier,
 
-		SubEventChan:      make(chan *Channel, 1),
+		SubEventChan:      make(chan *Channel, 1),	//在IOLoop中通知messagePump订阅
 		IdentifyEventChan: make(chan identifyEvent, 1),
 
 		// heartbeats are client configurable but default to 30s
