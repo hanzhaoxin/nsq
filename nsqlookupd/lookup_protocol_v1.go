@@ -82,13 +82,13 @@ func (p *LookupProtocolV1) IOLoop(conn net.Conn) error {
 
 func (p *LookupProtocolV1) Exec(client *ClientV1, reader *bufio.Reader, params []string) ([]byte, error) {
 	switch params[0] {
-	case "PING":
+	case "PING":	// 心跳
 		return p.PING(client, params)
-	case "IDENTIFY":
+	case "IDENTIFY":	// 确认
 		return p.IDENTIFY(client, reader, params[1:])
-	case "REGISTER":
+	case "REGISTER":	//	注册
 		return p.REGISTER(client, reader, params[1:])
-	case "UNREGISTER":
+	case "UNREGISTER":	// 注销
 		return p.UNREGISTER(client, reader, params[1:])
 	}
 	return nil, protocol.NewFatalClientErr(nil, "E_INVALID", fmt.Sprintf("invalid command %s", params[0]))

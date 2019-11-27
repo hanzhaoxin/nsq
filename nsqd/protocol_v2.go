@@ -180,25 +180,25 @@ func (p *protocolV2) Exec(client *clientV2, params [][]byte) ([]byte, error) {
 	switch {
 	case bytes.Equal(params[0], []byte("FIN")):	// 消息投送成功的处理
 		return p.FIN(client, params)
-	case bytes.Equal(params[0], []byte("RDY")):
+	case bytes.Equal(params[0], []byte("RDY")): // 消费者发送RDY命令，告诉服务端它以准备好接受count个消息，服务端则向消费者发送count个消息
 		return p.RDY(client, params)
 	case bytes.Equal(params[0], []byte("REQ")):	// 消息投递失败
 		return p.REQ(client, params)
-	case bytes.Equal(params[0], []byte("PUB")):	// 将消息发布到一个topic的逻辑
+	case bytes.Equal(params[0], []byte("PUB")):	// 将消息发布到一个topic
 		return p.PUB(client, params)
-	case bytes.Equal(params[0], []byte("MPUB")):
+	case bytes.Equal(params[0], []byte("MPUB")): //将多个消息发布到一个主题
 		return p.MPUB(client, params)
-	case bytes.Equal(params[0], []byte("DPUB")):
+	case bytes.Equal(params[0], []byte("DPUB")): //将一个延时消息发送到一个主题
 		return p.DPUB(client, params)
-	case bytes.Equal(params[0], []byte("NOP")):
+	case bytes.Equal(params[0], []byte("NOP")):	// 心跳回复，没有实际意义
 		return p.NOP(client, params)
-	case bytes.Equal(params[0], []byte("TOUCH")):
+	case bytes.Equal(params[0], []byte("TOUCH")): //重新设置消息处理超时时间
 		return p.TOUCH(client, params)
-	case bytes.Equal(params[0], []byte("SUB")):	// SUB方法从两个参数中得到订阅的topic和channel，并将client注册到改channel中。同时将channel传入client.SubEventChan，将在protocolV2的messagePump中进一步处理。
+	case bytes.Equal(params[0], []byte("SUB")):	//订阅，订阅后才能消费消息
 		return p.SUB(client, params)
-	case bytes.Equal(params[0], []byte("CLS")):
+	case bytes.Equal(params[0], []byte("CLS")): //关闭停止消费
 		return p.CLS(client, params)
-	case bytes.Equal(params[0], []byte("AUTH")):
+	case bytes.Equal(params[0], []byte("AUTH")): //授权
 		return p.AUTH(client, params)
 	}
 	return nil, protocol.NewFatalClientErr(nil, "E_INVALID", fmt.Sprintf("invalid command %s", params[0]))
