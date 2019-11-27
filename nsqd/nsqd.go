@@ -661,6 +661,8 @@ func (n *NSQD) queueScanWorker(workCh chan *Channel, responseCh chan bool, close
 //
 // If QueueScanDirtyPercent (default: 25%) of the selected channels were dirty,
 // the loop continues without sleep.
+// (1)定期   执行根据channel的数量控制worker Pool中worker的数量
+// (2)定期   检测channel中是否有可以投递的消息，如果有，则投递消息
 func (n *NSQD) queueScanLoop() {
 	workCh := make(chan *Channel, n.getOpts().QueueScanSelectionCount)
 	responseCh := make(chan bool, n.getOpts().QueueScanSelectionCount)

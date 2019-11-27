@@ -75,6 +75,11 @@ func connectCallback(n *NSQD, hostname string) func(*lookupPeer) {
 	}
 }
 
+/**
+(1)定时检测nsqd和nsqlookupd的连接信息（默认15s，执行一次PING命令来监听）
+(2)有Channel和Topic更新，则发送给所有配置的nsqlookupd
+(3)更新nsqlookupd配置
+ */
 func (n *NSQD) lookupLoop() {
 	var lookupPeers []*lookupPeer
 	var lookupAddrs []string
