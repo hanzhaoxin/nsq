@@ -284,7 +284,7 @@ func (n *NSQD) Main() error {
 		n.waitGroup.Wrap(n.statsdLoop)
 	}
 
-	err := <-exitCh
+	err := <-exitCh // 阻塞在此处，等待退出信号。
 	return err
 }
 

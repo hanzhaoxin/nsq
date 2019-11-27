@@ -113,6 +113,7 @@ func (n *NSQD) lookupLoop() {
 		select {
 		case <-ticker:
 			// send a heartbeat and read a response (read detects closed conns)
+			// 与nsqlookup保持心跳
 			for _, lookupPeer := range lookupPeers {
 				n.logf(LOG_DEBUG, "LOOKUPD(%s): sending heartbeat", lookupPeer)
 				cmd := nsq.Ping()
@@ -128,6 +129,7 @@ func (n *NSQD) lookupLoop() {
 			switch val.(type) {
 			case *Channel:
 				// notify all nsqlookupds that a new channel exists, or that it's removed
+				// 通知所有nsqlookup实例channel变更
 				branch = "channel"
 				channel := val.(*Channel)
 				if channel.Exiting() == true {
@@ -137,6 +139,7 @@ func (n *NSQD) lookupLoop() {
 				}
 			case *Topic:
 				// notify all nsqlookupds that a new topic exists, or that it's removed
+				// 通知所有nsqlookup实例topic变更
 				branch = "topic"
 				topic := val.(*Topic)
 				if topic.Exiting() == true {
@@ -165,6 +168,7 @@ func (n *NSQD) lookupLoop() {
 				n.logf(LOG_INFO, "LOOKUP(%s): removing peer", lp)
 				lp.Close()
 			}
+			// 更新nsqlookupd集群实例信息
 			lookupPeers = tmpPeers
 			lookupAddrs = tmpAddrs
 			connect = true
