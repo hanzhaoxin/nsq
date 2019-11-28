@@ -126,6 +126,7 @@ func (p *LookupProtocolV1) REGISTER(client *ClientV1, reader *bufio.Reader, para
 		return nil, err
 	}
 
+	// 在channel下添加生产者实例信息
 	if channel != "" {
 		key := Registration{"channel", topic, channel}
 		if p.ctx.nsqlookupd.DB.AddProducer(key, &Producer{peerInfo: client.peerInfo}) {
@@ -133,6 +134,8 @@ func (p *LookupProtocolV1) REGISTER(client *ClientV1, reader *bufio.Reader, para
 				client, "channel", topic, channel)
 		}
 	}
+
+	// 在topic下添加生产者实例信息
 	key := Registration{"topic", topic, ""}
 	if p.ctx.nsqlookupd.DB.AddProducer(key, &Producer{peerInfo: client.peerInfo}) {
 		p.ctx.nsqlookupd.logf(LOG_INFO, "DB: client(%s) REGISTER category:%s key:%s subkey:%s",
